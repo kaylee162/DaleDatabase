@@ -272,10 +272,23 @@ public class AVL<T extends Comparable<? super T>> {
      * @implNote <b>Fill in this method with your code.</b>
      */
     private void update(AVLNode<T> node) {
+
+        // Height of left child
+        // If left child is null, its height is defined as -1 (AVL convention)
         int leftHeight = (node.getLeft() == null) ? -1 : node.getLeft().getHeight();
+
+        // Height of right child
+        // Same null convention applies here
         int rightHeight = (node.getRight() == null) ? -1 : node.getRight().getHeight();
 
+        // Node's height is 1 + the maximum height of its children
+        // The +1 accounts for the current node itself
         node.setHeight(1 + Math.max(leftHeight, rightHeight));
+
+        // Balance factor = left subtree height - right subtree height
+        // Positive  → left heavy
+        // Negative  → right heavy
+        // 0         → perfectly balanced
         node.setBalanceFactor(leftHeight - rightHeight);
     }
 
@@ -285,17 +298,30 @@ public class AVL<T extends Comparable<? super T>> {
      * @implNote <b>Fill in this method with your code.</b>
      */
     private AVLNode<T> leftRotate(AVLNode<T> node) {
+
+        // The right child will become the new root after rotation
         AVLNode<T> newRoot = node.getRight();
+
+        // This subtree will be "transferred"
+        // It becomes the right child of the old root after rotation
         AVLNode<T> transferSubtree = newRoot.getLeft();
 
-        // rotate
+        // Perform rotation:
+        // Step 1: Move original root down to become left child of newRoot
         newRoot.setLeft(node);
+
+        // Step 2: Attach transferred subtree as right child of old root
         node.setRight(transferSubtree);
 
-        // update bottom-up: old root first, then new root
+        // IMPORTANT:
+        // Update heights and balance factors bottom-up
+        // First update the old root (now lower in tree)
         update(node);
+
+        // Then update the new root
         update(newRoot);
 
+        // Return new root of this subtree
         return newRoot;
     }
 
@@ -305,17 +331,29 @@ public class AVL<T extends Comparable<? super T>> {
      * @implNote <b>Fill in this method with your code.</b>
      */
     private AVLNode<T> rightRotate(AVLNode<T> node) {
+
+        // The left child will become the new root after rotation
         AVLNode<T> newRoot = node.getLeft();
+
+        // This subtree will be transferred
+        // It becomes the left child of the old root
         AVLNode<T> transferSubtree = newRoot.getRight();
 
-        // rotate
+        // Perform rotation:
+        // Step 1: Move original root down to become right child of newRoot
         newRoot.setRight(node);
+
+        // Step 2: Attach transferred subtree as left child of old root
         node.setLeft(transferSubtree);
 
-        // update bottom-up: old root first, then new root
+        // Update bottom-up:
+        // First update the old root (now lower)
         update(node);
+
+        // Then update the new root
         update(newRoot);
 
+        // Return new root of this subtree
         return newRoot;
     }
 
@@ -328,30 +366,48 @@ public class AVL<T extends Comparable<? super T>> {
      * @implNote <b>Fill in this method with your code.</b>
      */
     private AVLNode<T> balance(AVLNode<T> node) {
+
+        // Base case: empty subtree
         if (node == null) {
             return null;
         }
 
+        // Get balance factor of current node
         int bf = node.getBalanceFactor();
 
-        // Left heavy
+        // Case 1: Left heavy (balance factor > 1)
         if (bf > 1) {
-            // LR case: left child is right heavy
-            if (node.getLeft() != null && node.getLeft().getBalanceFactor() < 0) {
+
+            // Check for Left-Right (LR) case:
+            // Left child is right heavy (negative balance factor)
+            if (node.getLeft() != null &&
+                node.getLeft().getBalanceFactor() < 0) {
+
+                // First rotate left on left child
                 node.setLeft(leftRotate(node.getLeft()));
             }
+
+            // Then perform right rotation on current node
             return rightRotate(node);
         }
 
-        // Right heavy
+        // Case 2: Right heavy (balance factor < -1)
         if (bf < -1) {
-            // RL case: right child is left heavy
-            if (node.getRight() != null && node.getRight().getBalanceFactor() > 0) {
+
+            // Check for Right-Left (RL) case:
+            // Right child is left heavy (positive balance factor)
+            if (node.getRight() != null &&
+                node.getRight().getBalanceFactor() > 0) {
+
+                // First rotate right on right child
                 node.setRight(rightRotate(node.getRight()));
             }
+
+            // Then perform left rotation on current node
             return leftRotate(node);
         }
 
+        // If balance factor is -1, 0, or 1, subtree is already balanced
         return node;
     }
 }

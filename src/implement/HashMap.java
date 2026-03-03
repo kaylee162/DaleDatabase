@@ -12,7 +12,6 @@ import java.util.Set;
  */
 public class HashMap<K, V> implements Iterable<K> {
 
-
     /**
      * The initial capacity of the LinearProbingHashMap when created with the
      * default constructor.
@@ -28,7 +27,12 @@ public class HashMap<K, V> implements Iterable<K> {
      */
     public static final double MAX_LOAD_FACTOR = 0.67;
 
+    // The backing array that stores all MapEntry objects
+    // This is the actual hash table
     private MapEntry<K, V>[] table;
+
+    // The number of ACTIVE (non-removed) elements in the map
+    // This does NOT count tombstones
     private int size;
 
     /**
@@ -39,6 +43,7 @@ public class HashMap<K, V> implements Iterable<K> {
      * Use constructor chaining.
      */
     public HashMap() {
+        // Calls the other constructor with default capacity
         this(INITIAL_CAPACITY);
     }
 
@@ -52,6 +57,8 @@ public class HashMap<K, V> implements Iterable<K> {
      * @param initialCapacity the initial capacity of the backing array
      */
     public HashMap(int initialCapacity) {
+        // Create a new array of MapEntry references
+        // We must cast because Java does not allow generic array creation
         table = (MapEntry<K, V>[]) new MapEntry[initialCapacity];
         size = 0;
     }
@@ -73,49 +80,66 @@ public class HashMap<K, V> implements Iterable<K> {
      * @throws IllegalArgumentException if key or value is null
      */
     public V put(K key, V value) {
-        // error handling for null key or value
+
+        // Disallow null keys or values
+        // This prevents ambiguity and keeps behavior consistent
         if (key == null || value == null) {
             throw new IllegalArgumentException("Key or value cannot be null");
         }
 
-        // resize before inserting (based on size + 1)
+        // Check if inserting one more element would exceed max load factor
+        // (size + 1) because we are ABOUT to insert
         if ((size + 1.0) / table.length > MAX_LOAD_FACTOR) {
+            // Resize to 2n + 1 (standard strategy)
             resizeBackingTable(2 * table.length + 1);
         }
 
+        // Compute initial index using hashCode
+        // & 0x7fffffff ensures non-negative
         int startIndex = (key.hashCode() & 0x7fffffff) % table.length;
 
+        // Tracks first tombstone found during probing
         int firstRemovedIndex = -1;
+
+        // Begin probing from computed index
         int index = startIndex;
 
-        // Probe until we hit a null (end of cluster)
+        // Continue probing until we hit a null slot
+        // Null means end of cluster
         while (table[index] != null) {
             MapEntry<K, V> cur = table[index];
 
+            // If this entry is active and keys match → update
             if (!cur.isRemoved() && cur.getKey().equals(key)) {
-                // Key exists: update value, return old
                 V oldValue = cur.getValue();
                 cur.setValue(value);
                 return oldValue;
             }
 
+            // If entry is a tombstone and we haven't recorded one yet,
+            // remember this index for possible insertion
             if (cur.isRemoved() && firstRemovedIndex == -1) {
-                // Remember the first tombstone spot, but keep probing
                 firstRemovedIndex = index;
             }
 
+            // Linear probing: move forward by 1 (wrap around)
             index = (index + 1) % table.length;
 
-            // Safety: full loop (shouldn't happen if resizing is correct, but prevents infinite loop)
+            // Safety guard: stop if we looped entire table
             if (index == startIndex) {
                 break;
             }
         }
 
-        // Insert into first tombstone if it exists; otherwise into the null slot
+        // Prefer inserting into first tombstone found
+        // Otherwise insert into first null slot encountered
         int insertIndex = (firstRemovedIndex != -1) ? firstRemovedIndex : index;
+
         table[insertIndex] = new MapEntry<>(key, value);
+
+        // Increase active element count
         size++;
+
         return null;
     }
 
@@ -129,7 +153,7 @@ public class HashMap<K, V> implements Iterable<K> {
      * @throws NoSuchElementException   if the key is not in the map
      */
     public V remove(K key) {
-        // error handling for null key
+
         if (key == null) {
             throw new IllegalArgumentException("Key cannot be null");
         }
@@ -137,17 +161,24 @@ public class HashMap<K, V> implements Iterable<K> {
         int startIndex = (key.hashCode() & 0x7fffffff) % table.length;
         int index = startIndex;
 
+        // Probe until we hit null (key not present)
         while (table[index] != null) {
             MapEntry<K, V> cur = table[index];
 
+            // Found active matching key
             if (!cur.isRemoved() && cur.getKey().equals(key)) {
                 V oldValue = cur.getValue();
+
+                // Mark as tombstone instead of deleting
+                // This preserves probe chains
                 cur.setRemoved(true);
+
                 size--;
                 return oldValue;
             }
 
             index = (index + 1) % table.length;
+
             if (index == startIndex) {
                 break;
             }
@@ -158,29 +189,27 @@ public class HashMap<K, V> implements Iterable<K> {
 
     /**
      * Gets the value associated with the given key.
-     *
-     * @param key the key to search for in the map
-     * @return the value associated with the given key
-     * @throws IllegalArgumentException if key is null
-     * @throws NoSuchElementException   if the key is not in the map
      */
     public V get(K key) {
-        // error handling for null key
+
         if (key == null) {
             throw new IllegalArgumentException("Key cannot be null");
         }
-        
+
         int startIndex = (key.hashCode() & 0x7fffffff) % table.length;
         int index = startIndex;
 
+        // Probe exactly like put/remove
         while (table[index] != null) {
             MapEntry<K, V> cur = table[index];
 
+            // Only return if entry is active and matches
             if (!cur.isRemoved() && cur.getKey().equals(key)) {
                 return cur.getValue();
             }
 
             index = (index + 1) % table.length;
+
             if (index == startIndex) {
                 break;
             }
@@ -189,21 +218,12 @@ public class HashMap<K, V> implements Iterable<K> {
         throw new NoSuchElementException("Key not found in the map");
     }
 
-    /**
-     * Gets the value associated with the given key, or returns a provided default value.
-     * 
-     * @param key the key to search for in the map
-     * @param defaultValue the value to return if key not found
-     * @return the value associated with the given key if found,
-     * {@code defaultValue} otherwise
-     * @throws IllegalArgumentException if key is null
-     */
     public V getOrDefault(K key, V defaultValue) {
-        // error handling for null key 
+
         if (key == null) {
             throw new IllegalArgumentException("Key cannot be null");
         }
-        
+
         int startIndex = (key.hashCode() & 0x7fffffff) % table.length;
         int index = startIndex;
 
@@ -215,28 +235,22 @@ public class HashMap<K, V> implements Iterable<K> {
             }
 
             index = (index + 1) % table.length;
+
             if (index == startIndex) {
                 break;
             }
         }
 
+        // Instead of throwing exception, return provided default
         return defaultValue;
     }
 
-    /**
-     * Returns whether or not the key is in the map.
-     *
-     * @param key the key to search for in the map
-     * @return true if the key is contained within the map, false
-     * otherwise
-     * @throws IllegalArgumentException if key is null
-     */
     public boolean containsKey(K key) {
-        // error handling for null key  
+
         if (key == null) {
             throw new IllegalArgumentException("Key cannot be null");
         }
-        
+
         int startIndex = (key.hashCode() & 0x7fffffff) % table.length;
         int index = startIndex;
 
@@ -248,6 +262,7 @@ public class HashMap<K, V> implements Iterable<K> {
             }
 
             index = (index + 1) % table.length;
+
             if (index == startIndex) {
                 break;
             }
@@ -256,16 +271,14 @@ public class HashMap<K, V> implements Iterable<K> {
         return false;
     }
 
-    /**
-     * Returns a Set view of the keys contained in this map.
-     *
-     * Use java.util.HashSet.
-     *
-     * @return the set of keys in this map
-     */
     public Set<K> keySet() {
+        // HashSet automatically prevents duplicates
         Set<K> set = new HashSet<>();
+
+        // Iterate through entire backing array
         for (MapEntry<K, V> entry : table) {
+
+            // Only add active entries
             if (entry != null && !entry.isRemoved()) {
                 set.add(entry.getKey());
             }
@@ -273,19 +286,14 @@ public class HashMap<K, V> implements Iterable<K> {
         return set;
     }
 
-    /**
-     * Returns a List view of the values contained in this map.
-     *
-     * Use java.util.ArrayList or java.util.LinkedList.
-     *
-     * You should iterate over the table in order of increasing index and add
-     * entries to the List in the order in which they are traversed.
-     *
-     * @return list of values in this map
-     */
     public List<V> values() {
+        // ArrayList maintains traversal order
         List<V> list = new ArrayList<>();
+
+        // Traverse in increasing index order
         for (MapEntry<K, V> entry : table) {
+
+            // Add only active entries
             if (entry != null && !entry.isRemoved()) {
                 list.add(entry.getValue());
             }
@@ -293,53 +301,47 @@ public class HashMap<K, V> implements Iterable<K> {
         return list;
     }
 
-    /**
-     * Resize the backing table to length.
-     *
-     * Disregard the load factor for this method. So, if the passed in length is
-     * smaller than the current capacity, and this new length causes the table's
-     * load factor to exceed MAX_LOAD_FACTOR, you should still resize the table
-     * to the specified length.
-     *
-     * See the PDF for more details.
-     *
-     * @param length new length of the backing table
-     * @throws IllegalArgumentException if length is less than the
-     *                                            number of items in the hash
-     *                                            map
-     */
     public void resizeBackingTable(int length) {
+
         if (length < size) {
             throw new IllegalArgumentException("Length cannot be less than number of items in the map");
         }
 
+        // Keep reference to old table
         MapEntry<K, V>[] oldTable = table;
 
         @SuppressWarnings("unchecked")
         MapEntry<K, V>[] newTable = (MapEntry<K, V>[]) new MapEntry[length];
 
+        // Replace backing array
         table = newTable;
+
+        // Save size because we will rebuild
         int oldSize = size;
+
+        // Temporarily reset size to reinsert correctly
         size = 0;
 
-        // Rehash without triggering further resizes
+        // Reinsert all active entries into new table
+        // This recomputes indices using new capacity
         for (MapEntry<K, V> entry : oldTable) {
             if (entry != null && !entry.isRemoved()) {
                 putNoResize(entry.getKey(), entry.getValue());
             }
         }
 
+        // Restore correct size
         size = oldSize;
     }
-    /**
-     * Helper method to put a key-value pair into the map without checking for resizing.
-     * @param key
-     * @param value
-     */
+
+    // Helper method used ONLY during resizing
+    // Skips load factor check to avoid recursive resize
     private void putNoResize(K key, V value) {
+
         int startIndex = (key.hashCode() & 0x7fffffff) % table.length;
         int index = startIndex;
 
+        // Simple linear probing until null slot found
         while (table[index] != null) {
             index = (index + 1) % table.length;
         }
@@ -347,96 +349,64 @@ public class HashMap<K, V> implements Iterable<K> {
         table[index] = new MapEntry<>(key, value);
     }
 
-    /**
-     * Clears the map.
-     *
-     * Resets the table to a new array of the INITIAL_CAPACITY and resets the
-     * size.
-     *
-     * Must be O(1).
-     */
     public void clear() {
-        //clears the map by resetting the table to a new array of the INITIAL_CAPACITY and resets the size
+
+        // Allocate brand new array
+        // This makes clear O(1) because we do not iterate
         @SuppressWarnings("unchecked")
         MapEntry<K, V>[] newTable = (MapEntry<K, V>[]) new MapEntry[INITIAL_CAPACITY];
+
         table = newTable;
         size = 0;
     }
 
-    /**
-     * Returns the table of the map.
-     *
-     * For grading purposes only. You shouldn't need to use this method since
-     * you have direct access to the variable.
-     *
-     * @return the table of the map
-     */
     public MapEntry<K, V>[] getTable() {
-        // DO NOT MODIFY THIS METHOD!
         return table;
     }
 
-    /**
-     * Returns the size of the map.
-     *
-     * For grading purposes only. You shouldn't need to use this method since
-     * you have direct access to the variable.
-     *
-     * @return the size of the map
-     */
     public int size() {
-        // DO NOT MODIFY THIS METHOD!
         return size;
     }
 
-    /**
-     * Returns an iterator of all keys in the HashMap. The order should be the
-     * order they appear in the array from left to right.
-     * <p>
-     * Must be done in O(1) auxiliary space.
-     *
-     * @return an iterator of all keys in the HashMap
-     * @implNote you may create a private inner class to implement {@link Iterator}
-     */
     public Iterator<K> iterator() {
         return new HashMapIterator();
     }
-   
-    /**
-     * Iterator over the keys in the HashMap.
-     *
-     * Iterates through the backing table from left to right (in increasing
-     * index order) and returns only keys that correspond to non-null and
-     * non-removed entries.
-     *
-     * This iterator uses O(1) auxiliary space and does not modify the map.
-     *
-     * The iteration order reflects the physical layout of the backing array,
-     * not insertion order.
-     */
+
     private class HashMapIterator implements Iterator<K> {
+
+        // Current index in backing array
         private int index = 0;
+
+        // Number of valid elements returned so far
         private int seen = 0;
 
         @Override
         public boolean hasNext() {
+            // If we have returned fewer than size active elements,
+            // then more exist
             return seen < size;
         }
 
         @Override
         public K next() {
+
             if (!hasNext()) {
                 throw new NoSuchElementException("No more elements");
             }
 
-            while (index < table.length && (table[index] == null || table[index].isRemoved())) {
+            // Advance index until we hit active entry
+            while (index < table.length &&
+                  (table[index] == null || table[index].isRemoved())) {
                 index++;
             }
 
-            // index should now be at a valid entry
+            // Extract key at current index
             K key = table[index].getKey();
+
+            // Move forward for next call
             index++;
             seen++;
+
             return key;
         }
     }

@@ -4,10 +4,10 @@ import refactor.StaticTreeMap;
 /**
  * Entry point for accessing your project 2 files.
  *
- * @author YOUR NAME HERE
+ * @author Kaylee Henry
  * @version 1.0
- * @userid YOUR USER ID HERE (i.e. gburdell3)
- * @GTID YOUR GT ID HERE (i.e. 900000000)
+ * @userid khenry61
+ * @GTID 904065531
  * <br>
  * <p>
  * Collaborators: LIST ALL COLLABORATORS YOU WORKED WITH HERE
@@ -21,7 +21,7 @@ import refactor.StaticTreeMap;
  * points.
  *<p>
  *<br>
- * Agree Here: REPLACE THIS TEXT
+ * Agree Here: I agree
  */
 public class Main {
 
