@@ -225,7 +225,7 @@ public class AVL<T extends Comparable<? super T>> {
             throw new IllegalArgumentException();
         }
         return getH(root, data) != null;
-    }
+    }  
 
     /**
      * Returns the height of the root of the tree.

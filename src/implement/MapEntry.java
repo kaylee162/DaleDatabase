@@ -98,7 +98,6 @@ public class MapEntry<K, V> {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public boolean equals(Object o) {
         // DO NOT USE THIS METHOD IN YOUR CODE!  This is for testing ONLY!
         if (!(o instanceof MapEntry)) {
