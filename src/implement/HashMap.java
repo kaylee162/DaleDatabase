@@ -214,8 +214,9 @@ public class HashMap<K, V> implements Iterable<K> {
             throw new IllegalArgumentException("Key cannot be null");
         }
 
-        // Compute starting index
-        int startIndex = (key.hashCode() & 0x7fffffff) % table.length;
+        // Compute starting index using key's hash code
+        // Math.abs prevents negative indices
+        int startIndex = Math.abs(key.hashCode() % table.length);
 
         // Current probing index
         int index = startIndex;
@@ -257,7 +258,10 @@ public class HashMap<K, V> implements Iterable<K> {
             throw new IllegalArgumentException("Key and defaultValue cannot be null");
         }
 
-        int startIndex = (key.hashCode() & 0x7fffffff) % table.length;
+        // Compute starting index using key's hash code
+        // Math.abs prevents negative indices
+        int startIndex = Math.abs(key.hashCode() % table.length);
+
         int index = startIndex;
 
         // Probe table exactly like get()
@@ -288,13 +292,13 @@ public class HashMap<K, V> implements Iterable<K> {
      * @throws IllegalArgumentException if key is null
      */
     public boolean containsKey(K key) {
-
         // Prevent null key search
         if (key == null) {
             throw new IllegalArgumentException("Key cannot be null");
         }
 
-        int startIndex = (key.hashCode() & 0x7fffffff) % table.length;
+        // Compute starting index for probing
+        int startIndex = Math.abs(key.hashCode() % table.length);
         int index = startIndex;
 
         // Probe until null encountered
@@ -425,8 +429,11 @@ public class HashMap<K, V> implements Iterable<K> {
             throw new IllegalArgumentException("Key or value cannot be null");
         }
 
-        int startIndex = (key.hashCode() & 0x7fffffff) % table.length;
+        // Compute starting index using key's hash code
+        // Math.abs prevents negative indices
+        int startIndex = Math.abs(key.hashCode() % table.length);
 
+        // Track the first tombstone encountered during probing
         int firstRemovedIndex = -1;
         int index = startIndex;
 
