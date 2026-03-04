@@ -47,6 +47,16 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
         return old.value;
     }
 
+    /**
+     * Recursive helper method for inserting a key-value pair into the AVL tree.
+     * Performs standard BST insertion followed by AVL rebalancing.
+     *
+     * @param curr the current node being examined
+     * @param key the key to insert
+     * @param value the value to associate with the key
+     * @param old box used to return the previous value if the key already exists
+     * @return the updated subtree root after insertion and balancing
+     */
     private TreeMapNode<K, V> putH(TreeMapNode<K, V> curr, K key, V value, ValueBox<V> old) {
         if (curr == null) {
             size++;
@@ -139,6 +149,14 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
         return removed.value;
     }
 
+    /**
+     * Recursive helper method for removing a key from the AVL tree.
+     *
+     * @param curr the current node being examined
+     * @param key the key to remove
+     * @param removed box used to store the removed value
+     * @return the updated subtree root after removal and balancing
+     */
     private TreeMapNode<K, V> removeH(TreeMapNode<K, V> curr, K key, ValueBox<V> removed) {
         if (curr == null) {
             throw new NoSuchElementException("key not found.");
@@ -169,6 +187,14 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
         return balance(curr);
     }
 
+    /**
+     * Removes the predecessor node (maximum node of the left subtree)
+     * during a two-child deletion case.
+     *
+     * @param curr the current subtree root
+     * @param pred box used to store the predecessor key and value
+     * @return the updated subtree root after predecessor removal
+     */
     private TreeMapNode<K, V> removePredecessor(TreeMapNode<K, V> curr, NodeBox<K, V> pred) {
         if (curr.getRight() == null) {
             pred.key = curr.getKey();
@@ -205,6 +231,15 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
         return out;
     }
 
+    /**
+     * Recursive helper method that performs a bounded in-order traversal
+     * to collect values whose keys fall within the specified range.
+     *
+     * @param curr the current node being visited
+     * @param lower the lower bound
+     * @param upper the upper bound
+     * @param out the list collecting qualifying values
+     */
     private void getRangeH(TreeMapNode<K, V> curr, K lower, K upper, List<V> out) {
         if (curr == null) {
             return;
@@ -242,6 +277,13 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
         return keys;
     }
 
+    /**
+     * Recursive helper method that performs an in-order traversal
+     * to collect all keys in sorted order.
+     *
+     * @param curr the current node being visited
+     * @param keys the set collecting keys
+     */
     private void keySetH(TreeMapNode<K, V> curr, Set<K> keys) {
         if (curr == null) {
             return;
@@ -262,6 +304,13 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
         return vals;
     }
 
+    /**
+     * Recursive helper method that performs an in-order traversal
+     * to collect values in sorted key order.
+     *
+     * @param curr the current node
+     * @param vals the list collecting values
+     */
     private void valuesH(TreeMapNode<K, V> curr, List<V> vals) {
         if (curr == null) {
             return;
@@ -300,17 +349,27 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
     /**
      * Returns the root node (useful for testing/visualization).
      *
-     * @return root
+     * @return root node of the AVL tree
      */
     public TreeMapNode<K, V> getRoot() {
         return root;
     }
 
+    /**
+     * Returns an iterator over the values of the map in ascending key order.
+     *
+     * @return an in-order iterator over the values
+     */
     @Override
     public Iterator<V> iterator() {
         return new TreeMapIterator();
     }
 
+    /**
+     * Updates the height and balance factor of a node based on its children.
+     *
+     * @param node the node to update
+     */
     private void update(TreeMapNode<K, V> node) {
         int lh = (node.getLeft() == null) ? -1 : node.getLeft().getHeight();
         int rh = (node.getRight() == null) ? -1 : node.getRight().getHeight();
@@ -318,6 +377,12 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
         node.setBalanceFactor(lh - rh);
     }
 
+    /**
+     * Performs a left rotation around the given node.
+     *
+     * @param node the root of the rotation
+     * @return the new subtree root after rotation
+     */
     private TreeMapNode<K, V> leftRotate(TreeMapNode<K, V> node) {
         TreeMapNode<K, V> newRoot = node.getRight();
         TreeMapNode<K, V> transfer = newRoot.getLeft();
@@ -330,6 +395,12 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
         return newRoot;
     }
 
+    /**
+     * Performs a right rotation around the given node.
+     *
+     * @param node the root of the rotation
+     * @return the new subtree root after rotation
+     */
     private TreeMapNode<K, V> rightRotate(TreeMapNode<K, V> node) {
         TreeMapNode<K, V> newRoot = node.getLeft();
         TreeMapNode<K, V> transfer = newRoot.getRight();
@@ -342,6 +413,13 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
         return newRoot;
     }
 
+    /**
+     * Restores AVL balance for the given node if its balance factor
+     * indicates that it is unbalanced.
+     *
+     * @param node the node to rebalance
+     * @return the new subtree root after balancing
+     */
     private TreeMapNode<K, V> balance(TreeMapNode<K, V> node) {
         int bf = node.getBalanceFactor();
 
@@ -360,23 +438,49 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
         return node;
     }
 
+    /**
+     * Simple wrapper class used to pass a mutable reference
+     * when returning old values during insertion or removal.
+     *
+     * @param <T> the boxed value type
+     */
     private static class ValueBox<T> {
         private T value;
     }
 
+    /**
+     * Helper container used to return predecessor key-value pairs
+     * during deletion operations.
+     *
+     * @param <K> key type
+     * @param <V> value type
+     */
     private static class NodeBox<K, V> {
         private K key;
         private V value;
     }
 
+    /**
+     * Iterator implementation that performs an in-order traversal
+     * over the AVL tree values.
+     */
     private class TreeMapIterator implements Iterator<V> {
 
         private final Deque<TreeMapNode<K, V>> stack = new ArrayDeque<>();
 
+        /**
+         * Constructs the iterator and initializes the stack
+         * with the leftmost path of the tree.
+         */
         private TreeMapIterator() {
             pushLeft(root);
         }
 
+        /**
+         * Pushes all nodes along the left path of a subtree onto the stack.
+         *
+         * @param node the subtree root
+         */
         private void pushLeft(TreeMapNode<K, V> node) {
             TreeMapNode<K, V> curr = node;
             while (curr != null) {
@@ -385,11 +489,22 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
             }
         }
 
+        /**
+         * Returns whether the iterator has more elements.
+         *
+         * @return true if another value exists
+         */
         @Override
         public boolean hasNext() {
             return !stack.isEmpty();
         }
 
+        /**
+         * Returns the next value in ascending key order.
+         *
+         * @return the next value
+         * @throws NoSuchElementException if no elements remain
+         */
         @Override
         public V next() {
             if (!hasNext()) {

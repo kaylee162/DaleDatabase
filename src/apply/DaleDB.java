@@ -2,36 +2,33 @@ package apply;
 
 import java.util.NoSuchElementException;
 
+/**
+ * A simple database for storing and querying {@link DaleRecord} objects by pond and timestamp.
+ * <p>
+ * World model:
+ * <ul>
+ *   <li>Ponds contain activity records.</li>
+ *   <li>Ducks may enter/exit ponds (boundary events) and report caught fish (fish reports).</li>
+ *   <li>Cow names may appear alongside duck names; which names are cows is unknown.</li>
+ *   <li>Low-activity ponds may be evicted to save space.</li>
+ * </ul>
+ *
+ * <p>Record types include:
+ * <ul>
+ *   <li><b>BoundaryEvent</b>: entrances/exits at pond boundaries, listing animals involved and the
+ *       number of cows detected among them.</li>
+ *   <li><b>FishReport</b>: stores a duck’s list of fish weights caught during a fishing event.</li>
+ * </ul>
+ *
+ * @author Kaylee Henry the author of this class
+ * @version 1.0 the version of this implementation
+ * @userid khenry61 the Georgia Tech user id
+ * @GTID 904065531 the Georgia Tech ID number
+ */
 public class DaleDB {
-    /**
-     * @author Kaylee Henry
-     * @version 1.0
-     * @userid khenry61
-     * @GTID 904065531
-     */
-    /** Our world is simple: there are Ponds, Ducks, Fish, and Cows.
-     *  - Ducks fly around, and sometimes enter and exit ponds. These movements are tracked in the
-     *  database.
-     * 
-     *  - When at a pond, a duck can go fishing. Every so often, a duck will report its caught fish to the
-     *  database.
-     * 
-     *  - Sometimes, cows wander into or out of a pond area. Their name is recorded alongside the duck
-     *  names, but it is unknown which names are cows and which are ducks.
-     * 
-     *  - To save space in the database, we prioritize recording information for active ponds. If a pond has
-     *  little or no activity, its records may be destroyed (see evict).
-     
-    
-     * BoundaryEvent: marks entrances and exits at pond boundaries, listing the animals involved and
-     * the number of cows detected among those listed animals.
-     * 
-     * FishReport: stores a duck’s list of fish weights caught during a fishing event 
-     */
-
 
     /**
-     * Constructs a new instance of the DaleDB class.
+     * Constructs a new instance of the {@code DaleDB} class.
      */
     public DaleDB() {
         // Constructor implementation
@@ -39,20 +36,22 @@ public class DaleDB {
     }
 
     /**
-     * Constructs a DaleDB from a dale record????.
+     * Constructs a {@code DaleDB} from a serialized dale record source.
+     * <p>
+     * Note: Placeholder documentation until the constructor signature is defined.
      */
     // PUT HERE
 
     /**
-     * This method accepts any type of record and inserts it into the database, or modifies it if it already exists,
-     * both in O(log(r)) time. 
-     * 
-     * Return the old DaleRecord if it was modified, otherwise return null
-     * 
-     * @param key
-     * @param value
-     * @return the old DaleRecord if it was modified, otherwise return null
-     * @throws IllegalArgumentException if the pond name or timestamp is null
+     * Accepts any type of record and inserts it into the database, or modifies it if it already exists,
+     * both in {@code O(log(r))} time.
+     * <p>
+     * Returns the old {@link DaleRecord} if it was modified; otherwise returns {@code null}.
+     *
+     * @param key the record key (e.g., pond name and timestamp identifier)
+     * @param value the record payload to store for the given key
+     * @return the old {@link DaleRecord} if it was modified; otherwise {@code null}
+     * @throws IllegalArgumentException if the key or value is {@code null}
      */
     public static DaleRecord putRecord(String key, String value) {
         // Implementation for putting a record into the database
@@ -66,14 +65,15 @@ public class DaleDB {
     }
 
     /**
-     * This method accepts a pond name and timestamp, and deletes the record with that timestamp from 
-     * that pond in O(log(r)) time. 
-     * 
-     * Return the deleted DaleRecord. If the pond name is null, throw an IllegalArgumentException. If the 
-     * record does not exist, throw a NoSuchElementException. 
-     * @param key
-     * @return the deleted DaleRecord
-     * @throws IllegalArgumentException if the pond name is null
+     * Accepts a pond name and timestamp, and deletes the record with that timestamp from
+     * that pond in {@code O(log(r))} time.
+     * <p>
+     * Returns the deleted {@link DaleRecord}.
+     *
+     * @param key the record key to delete (e.g., pond name and timestamp identifier)
+     * @return the deleted {@link DaleRecord}
+     * @throws IllegalArgumentException if the key is {@code null}
+     * @throws NoSuchElementException if the record does not exist
      */
     public static DaleRecord deleteRecord(String key) {
         // Implementation for deleting a record from the database
@@ -87,15 +87,12 @@ public class DaleDB {
     }
 
     /**
-     * This method accepts a pond name and timestamp, and returns the record with that timestamp from
-     * that pond in O(log(r)) time.
-     * 
-     * If the pond name is null, throw an IllegalArgumentException. If the record does not exist, throw
-     * a NoSuchElementException
-     * 
-     * @param key
-     * @return the DaleRecord with the specified key
-     * @throws IllegalArgumentException if the pond name is null
+     * Accepts a pond name and timestamp, and returns the record with that timestamp from
+     * that pond in {@code O(log(r))} time.
+     *
+     * @param key the record key to search for (e.g., pond name and timestamp identifier)
+     * @return the {@link DaleRecord} associated with the given key
+     * @throws IllegalArgumentException if the key is {@code null}
      * @throws NoSuchElementException if the record does not exist
      */
     public static DaleRecord getRecord(String key) {
@@ -106,22 +103,19 @@ public class DaleDB {
             throw new IllegalArgumentException("Pond name cannot be null.");
         }
 
-        return null; 
+        return null;
     }
 
-    /**      
-     * This method accepts a pond name and returns a list of all records in that pond in O(r) time. The list
-     * must be sorted in ascending order by timestamp.
-     * 
-     * If the pond name is null, throw an IllegalArgumentException. Note that an existing pond should
-     * never be empty, as empty ponds are removed from the database. If the pond does not exist, you should
-     * 
-     * return an empty list as there are no records associated with this pond name.
-     * 
-     * @param pondName
-     * @return a list of all records in the specified pond, sorted in ascending order by
-     * @throws IllegalArgumentException if the pond name is null
-    */
+    /**
+     * Accepts a pond name and returns a list of all records in that pond in {@code O(r)} time.
+     * The list must be sorted in ascending order by timestamp.
+     * <p>
+     * If the pond does not exist, returns an empty list.
+     *
+     * @param pondName the name of the pond to retrieve records for
+     * @return a list of all records in the specified pond, sorted in ascending timestamp order
+     * @throws IllegalArgumentException if {@code pondName} is {@code null}
+     */
     public static DaleRecord getPond(String pondName) {
         // Implementation for retrieving a pond record from the database
 
@@ -130,12 +124,13 @@ public class DaleDB {
             throw new IllegalArgumentException("Pond name cannot be null.");
         }
 
-        return null; 
+        return null;
     }
 
     /**
-     * his method simply returns the number of ponds in the database in O(1) time. In the example below
-     * on this page, there are two ponds, Pond X and Pond Y, so the method call would return 2.
+     * Returns the number of ponds in the database in {@code O(1)} time.
+     *
+     * @return the number of ponds currently stored
      */
     public static int getNumPonds() {
         // Implementation for retrieving the number of ponds in the database
@@ -143,26 +138,18 @@ public class DaleDB {
     }
 
     /**
-     * This method accepts a pond name, start timestamp, and end timestamp, and returns a list of all records
-     * in that pond in the inclusive range [start,end]. The returned list must be sorted in ascending order by
-     * timestamp.
-     * 
-     * If the pond name is null, throw an IllegalArgumentException. Note that an existing pond should
-     * never be empty, as empty ponds are removed from the database. If the pond does not exist, throw a
-     * NoSuchElementException.
-     * 
-     * If there are no values within the range (or the range is impossible), return an empty list. The bounds
-     * are not necessarily timestamps that actually correspond to a record.
-     * 
-     * Your code must have an O(r) time complexity and O(log(r)) auxiliary space complexity (which ex-
-     * cludes the output list).
-     * 
-     * @param pondName
-     * @param start
-     * @param end
-     * @return a list of all records in the specified pond within the inclusive range [start,end]
-     * @throws IllegalArgumentException if the pond name is null
-     * @throws IllegalArgumentException if the start or end timestamp is null
+     * Accepts a pond name, start timestamp, and end timestamp, and returns a list of all records
+     * in that pond in the inclusive range {@code [start, end]}.
+     * The returned list must be sorted in ascending order by timestamp.
+     * <p>
+     * If there are no values within the range (or the range is impossible), returns an empty list.
+     *
+     * @param pondName the name of the pond to query
+     * @param start the start timestamp (inclusive)
+     * @param end the end timestamp (inclusive)
+     * @return a list of all records in the specified pond within the inclusive range {@code [start,end]}
+     * @throws IllegalArgumentException if {@code pondName} is {@code null}
+     * @throws IllegalArgumentException if {@code start} or {@code end} is {@code null}
      * @throws NoSuchElementException if the pond does not exist
      */
     public static DaleRecord getPondRange(String pondName, String start, String end) {

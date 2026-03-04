@@ -380,8 +380,8 @@ public class AVL<T extends Comparable<? super T>> {
 
             // Check for Left-Right (LR) case:
             // Left child is right heavy (negative balance factor)
-            if (node.getLeft() != null &&
-                node.getLeft().getBalanceFactor() < 0) {
+            if (node.getLeft() != null 
+                && node.getLeft().getBalanceFactor() < 0) {
 
                 // First rotate left on left child
                 node.setLeft(leftRotate(node.getLeft()));
@@ -396,8 +396,8 @@ public class AVL<T extends Comparable<? super T>> {
 
             // Check for Right-Left (RL) case:
             // Right child is left heavy (positive balance factor)
-            if (node.getRight() != null &&
-                node.getRight().getBalanceFactor() > 0) {
+            if (node.getRight() != null 
+                && node.getRight().getBalanceFactor() > 0) {
 
                 // First rotate right on right child
                 node.setRight(rightRotate(node.getRight()));
