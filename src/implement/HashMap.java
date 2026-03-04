@@ -58,8 +58,10 @@ public class HashMap<K, V> implements Iterable<K> {
      */
     public HashMap(int initialCapacity) {
         // Create a new array of MapEntry references
-        // We must cast because Java does not allow generic array creation
+        // Java does not allow generic array creation directly, so we cast
         table = (MapEntry<K, V>[]) new MapEntry[initialCapacity];
+
+        // Map starts empty
         size = 0;
     }
 
@@ -80,70 +82,71 @@ public class HashMap<K, V> implements Iterable<K> {
      * @throws IllegalArgumentException if key or value is null
      */
     public V put(K key, V value) {
-        // This method adds a key-value pair to the hash map, handling collisions with linear probing.
 
-        // error handling for null key or value
-        // This is important to prevent null keys/values in the map
+        // Prevent null keys or values
         if (key == null || value == null) {
             throw new IllegalArgumentException("Key or value cannot be null");
         }
 
-        // Check if inserting one more element would exceed max load factor
-        // (size + 1) because we are ABOUT to insert
-        if ((size + 1.0) / table.length > MAX_LOAD_FACTOR) {
-            // Resize to 2n + 1 (standard strategy)
+        // Check if adding one more element exceeds load factor
+        // If so, resize table before inserting
+        if ((size + 1) / (double) table.length >= MAX_LOAD_FACTOR) {
             resizeBackingTable(2 * table.length + 1);
         }
 
-        // Compute initial index using hashCode
-        // & 0x7fffffff ensures non-negative
-        int startIndex = (key.hashCode() & 0x7fffffff) % table.length;
+        // Compute starting index using key's hash code
+        // Math.abs prevents negative indices
+        int index = Math.abs(key.hashCode() % table.length);
 
-        // Tracks first tombstone found during probing
-        int firstRemovedIndex = -1;
+        // Track the first tombstone encountered during probing
+        int firstDeleted = -1;
 
-        // Begin probing from computed index
-        int index = startIndex;
+        // Probe through table
+        for (int i = 0; i < table.length; i++) {
 
-        // FIX: bounded probing so we never "break and overwrite" at startIndex
-        for (int probes = 0; probes < table.length; probes++) {
-            MapEntry<K, V> cur = table[index];
+            // Linear probing index calculation
+            int probe = ((index + i) % table.length);
 
-            // Null means end of cluster, safe place to insert
-            if (cur == null) {
-                int insertIndex = (firstRemovedIndex != -1) ? firstRemovedIndex : index;
-                table[insertIndex] = new MapEntry<>(key, value);
+            // Empty slot found
+            if (table[probe] == null) {
+
+                // Prefer inserting into earlier tombstone if found
+                if (firstDeleted != -1) {
+                    table[firstDeleted] = new MapEntry<>(key, value);
+                } else {
+                    table[probe] = new MapEntry<>(key, value);
+                }
+
+                // Increase active element count
                 size++;
-                return null;
-            }
 
-            // If this entry is active and keys match → update
-            if (!cur.isRemoved() && cur.getKey().equals(key)) {
-                V oldValue = cur.getValue();
-                cur.setValue(value);
+                // New key inserted
+                return null;
+
+            } else if (table[probe].isRemoved()) {
+
+                // Record first tombstone index for reuse
+                if (firstDeleted == -1) {
+                    firstDeleted = probe;
+                }
+
+            } else if (table[probe].getKey().equals(key)) {
+
+                // Key already exists — replace value
+                V oldValue = table[probe].getValue();
+                table[probe].setValue(value);
+
                 return oldValue;
             }
-
-            // If entry is a tombstone or del marker and we haven't recorded one yet,
-            // remember this index for possible insertion
-            if (cur.isRemoved() && firstRemovedIndex == -1) {
-                firstRemovedIndex = index;
-            }
-
-            // Linear probing: move forward by 1 (wrap around)
-            index = (index + 1) % table.length;
         }
 
-        // FIX: if we scanned the whole table and found a tombstone, insert there
-        if (firstRemovedIndex != -1) {
-            table[firstRemovedIndex] = new MapEntry<>(key, value);
-            size++;
-            return null;
-        }
+        // If table contained tombstone but no empty slot
+        // insert at first tombstone location
+        table[firstDeleted] = new MapEntry<>(key, value);
 
-        // FIX: extremely rare physical-full case; resize and retry safely
-        resizeBackingTable(2 * table.length + 1);
-        return put(key, value);
+        size++;
+
+        return null;
     }
 
     /**
@@ -156,49 +159,44 @@ public class HashMap<K, V> implements Iterable<K> {
      * @throws NoSuchElementException   if the key is not in the map
      */
     public V remove(K key) {
-        // This method removes the entry with the specified key by marking it as removed (tombstone).
 
-        // error handling for null key
+        // Prevent null key removal
         if (key == null) {
             throw new IllegalArgumentException("Key cannot be null");
         }
 
-        // Compute initial index using hashCode
-        // & 0x7fffffff ensures non-negative
-        int startIndex = (key.hashCode() & 0x7fffffff) % table.length;
+        // Compute starting probe index
+        int index = Math.abs(key.hashCode() % table.length);
 
-        // Begin probing from computed index
-        int index = startIndex;
+        // Probe through table
+        for (int i = 0; i < table.length; i++) {
 
-        // Probe until we hit null (key not present)
-        while (table[index] != null) {
-            // Get the current entry at this index
-            MapEntry<K, V> cur = table[index];
+            int probe = (index + i) % table.length;
 
-            // Found active matching key
-            if (!cur.isRemoved() && cur.getKey().equals(key)) {
-                // Store old value to return
-                V oldValue = cur.getValue();
+            // If null encountered, key does not exist
+            if (table[probe] == null) {
+                throw new NoSuchElementException("Key not found in the map.");
 
-                // Mark as tombstone instead of deleting
-                // This preserves probe chains
-                cur.setRemoved(true);
+            // Skip tombstones
+            } else if (table[probe].isRemoved()) {
+                continue;
 
-                // Decrease active element count and return the old value
+            // Active matching key found
+            } else if (table[probe].getKey().equals(key)) {
+
+                V oldValue = table[probe].getValue();
+
+                // Mark entry as removed instead of deleting
+                table[probe].setRemoved(true);
+
+                // Decrease active size
                 size--;
+
                 return oldValue;
-            }
-
-            // Linear probing: move forward by 1 (wrap around)
-            index = (index + 1) % table.length;
-
-            // Safety guard: stop if we looped entire table
-            if (index == startIndex) {
-                break;
             }
         }
 
-        // If we reach here, the key was not found in the map
+        // Entire probe sequence searched without match
         throw new NoSuchElementException("Key not found in the map");
     }
 
@@ -210,39 +208,37 @@ public class HashMap<K, V> implements Iterable<K> {
      * @throws NoSuchElementException if the key is not in the map
      */
     public V get(K key) {
-        // This method retrieves the value associated with the specified key.
 
-        // error handling for null key
+        // Prevent null key lookup
         if (key == null) {
             throw new IllegalArgumentException("Key cannot be null");
         }
 
-        // Compute initial index using hashCode
-        // & 0x7fffffff ensures non-negative
+        // Compute starting index
         int startIndex = (key.hashCode() & 0x7fffffff) % table.length;
-        // Begin probing from computed index
+
+        // Current probing index
         int index = startIndex;
 
-        // Probe exactly like put/remove
+        // Probe until empty slot encountered
         while (table[index] != null) {
-            // Set current entry for easier access
+
             MapEntry<K, V> cur = table[index];
 
-            // Only return if entry is active and matches
+            // Return value if active entry matches
             if (!cur.isRemoved() && cur.getKey().equals(key)) {
                 return cur.getValue();
             }
 
-            // Linear probing: move forward by 1 (wrap around)
+            // Continue linear probing
             index = (index + 1) % table.length;
 
-            // Safety guard: stop if we looped entire table
+            // Stop if we've looped entire table
             if (index == startIndex) {
                 break;
             }
         }
 
-        // If we reach here, the key was not found in the map
         throw new NoSuchElementException("Key not found in the map");
     }
 
@@ -255,17 +251,18 @@ public class HashMap<K, V> implements Iterable<K> {
      * @throws IllegalArgumentException if key is null
      */
     public V getOrDefault(K key, V defaultValue) {
-        // This method retrieves the value associated with the specified key, or returns a default value if the key is not present.
 
-        // error handling for null key
-        if (key == null) {
-            throw new IllegalArgumentException("Key cannot be null");
+        // Prevent null arguments
+        if (key == null || defaultValue == null) {
+            throw new IllegalArgumentException("Key and defaultValue cannot be null");
         }
 
         int startIndex = (key.hashCode() & 0x7fffffff) % table.length;
         int index = startIndex;
 
+        // Probe table exactly like get()
         while (table[index] != null) {
+
             MapEntry<K, V> cur = table[index];
 
             if (!cur.isRemoved() && cur.getKey().equals(key)) {
@@ -279,7 +276,7 @@ public class HashMap<K, V> implements Iterable<K> {
             }
         }
 
-        // Instead of throwing exception, return provided default
+        // If not found return default
         return defaultValue;
     }
 
@@ -291,39 +288,34 @@ public class HashMap<K, V> implements Iterable<K> {
      * @throws IllegalArgumentException if key is null
      */
     public boolean containsKey(K key) {
-        // This method checks if the map contains the specified key.
 
-        // error handling for null key
+        // Prevent null key search
         if (key == null) {
             throw new IllegalArgumentException("Key cannot be null");
         }
 
-        // Compute initial index using hashCode
-        // & 0x7fffffff ensures non-negative
         int startIndex = (key.hashCode() & 0x7fffffff) % table.length;
-        // Begin probing from computed index
         int index = startIndex;
 
-        // Probe until we hit null (key not present)
+        // Probe until null encountered
         while (table[index] != null) {
-            // Set current entry for easier access
+
             MapEntry<K, V> cur = table[index];
 
-            // Only return true if entry is active and matches
+            // Found matching active key
             if (!cur.isRemoved() && cur.getKey().equals(key)) {
-                return true; // Key found in the map
+                return true;
             }
 
-            // Linear probing: move forward by 1 (wrap around)
             index = (index + 1) % table.length;
 
-            // Safety guard: stop if we looped entire table
+            // Stop if full loop completed
             if (index == startIndex) {
                 break;
             }
         }
 
-        // If we reach here, the key was not found in the map
+        // Key not found
         return false;
     }
 
@@ -334,19 +326,19 @@ public class HashMap<K, V> implements Iterable<K> {
      * @return a set of all keys in the map
      */
     public Set<K> keySet() {
-        // HashSet automatically prevents duplicates
+
+        // HashSet ensures no duplicate keys
         Set<K> set = new HashSet<>();
 
-        // Iterate through entire backing array
+        // Iterate entire backing array
         for (MapEntry<K, V> entry : table) {
 
-            // Only add active entries
+            // Only include active entries
             if (entry != null && !entry.isRemoved()) {
-                // Add the key to the set
                 set.add(entry.getKey());
             }
         }
-        // Return the set of keys
+
         return set;
     }
 
@@ -357,19 +349,19 @@ public class HashMap<K, V> implements Iterable<K> {
      * @return a list of all values in the map
      */
     public List<V> values() {
-        // ArrayList maintains traversal order
+
+        // ArrayList preserves traversal order
         List<V> list = new ArrayList<>();
 
-        // Traverse in increasing index order
+        // Traverse backing table
         for (MapEntry<K, V> entry : table) {
 
-            // Add only active entries
+            // Include only active entries
             if (entry != null && !entry.isRemoved()) {
-                // Add the value to the list
                 list.add(entry.getValue());
             }
         }
-        // Return the list of values
+
         return list;
     }
 
@@ -383,39 +375,38 @@ public class HashMap<K, V> implements Iterable<K> {
      *                                  items in the map
      */
     public void resizeBackingTable(int length) {
-        // This method resizes the backing array to the specified length and rehashes all active entries.
 
-        // error handling for length less than current size
+        // Prevent shrinking table below current number of items
         if (length < size) {
             throw new IllegalArgumentException("Length cannot be less than number of items in the map");
         }
 
-        // Keep reference to old table
-        MapEntry<K, V>[] oldTable = table;
+        // Create new table
+        MapEntry<K, V>[] newTable = new MapEntry[length];
 
-        // Create new table with specified length
-        MapEntry<K, V>[] newTable = (MapEntry<K, V>[]) new MapEntry[length];
+        // Rehash every active entry
+        for (int i = 0; i < table.length; i++) {
 
-        // Replace backing array
-        table = newTable;
+            if (table[i] != null && !table[i].isRemoved()) {
 
-        // Save size because we will rebuild
-        int oldSize = size;
+                // Compute new index based on new table size
+                int index = Math.abs(table[i].getKey().hashCode() % length);
 
-        // Temporarily reset size to reinsert correctly
-        size = 0;
+                // Linear probe into new table
+                for (int j = 0; j < length; j++) {
 
-        // Reinsert all active entries into new table
-        // This recomputes indices using new capacity
-        for (MapEntry<K, V> entry : oldTable) {
-            if (entry != null && !entry.isRemoved()) {
-                // Use helper method to insert without checking load factor
-                putNoResize(entry.getKey(), entry.getValue());
+                    int probeIndex = (index + j) % length;
+
+                    if (newTable[probeIndex] == null) {
+                        newTable[probeIndex] = table[i];
+                        break;
+                    }
+                }
             }
         }
 
-        // Restore correct size
-        size = oldSize;
+        // Replace old table
+        table = newTable;
     }
 
     /**
@@ -428,33 +419,39 @@ public class HashMap<K, V> implements Iterable<K> {
      * @throws IllegalStateException if the table is full
      */
     private void putNoResize(K key, V value) {
-        // error handling for null key or value
+
+        // Prevent null arguments
         if (key == null || value == null) {
             throw new IllegalArgumentException("Key or value cannot be null");
         }
 
-        // Compute initial index using hashCode
-        // & 0x7fffffff ensures non-negative
         int startIndex = (key.hashCode() & 0x7fffffff) % table.length;
 
         int firstRemovedIndex = -1;
         int index = startIndex;
 
-        // FIX: bounded probing + tombstone reuse + no infinite loop
+        // Probe through table
         for (int probes = 0; probes < table.length; probes++) {
+
             MapEntry<K, V> cur = table[index];
 
+            // Empty slot found
             if (cur == null) {
+
                 int insertIndex = (firstRemovedIndex != -1) ? firstRemovedIndex : index;
+
                 table[insertIndex] = new MapEntry<>(key, value);
+
                 return;
             }
 
+            // Replace value if key already exists
             if (!cur.isRemoved() && cur.getKey().equals(key)) {
                 cur.setValue(value);
                 return;
             }
 
+            // Track first tombstone
             if (cur.isRemoved() && firstRemovedIndex == -1) {
                 firstRemovedIndex = index;
             }
@@ -462,11 +459,13 @@ public class HashMap<K, V> implements Iterable<K> {
             index = (index + 1) % table.length;
         }
 
+        // Insert into tombstone if one exists
         if (firstRemovedIndex != -1) {
             table[firstRemovedIndex] = new MapEntry<>(key, value);
             return;
         }
 
+        // Table full edge case
         throw new IllegalStateException("HashMap backing table is full during putNoResize.");
     }
 
@@ -474,12 +473,11 @@ public class HashMap<K, V> implements Iterable<K> {
      * Clears the map by resetting the backing array to initial capacity and size to 0.
      */
     public void clear() {
-        // Allocate brand new array
-        // This makes clear O(1) because we do not iterate
-        MapEntry<K, V>[] newTable = (MapEntry<K, V>[]) new MapEntry[INITIAL_CAPACITY];
 
-        // Reset the backing array and size
-        table = newTable;
+        // Allocate new empty table
+        table = new MapEntry[INITIAL_CAPACITY];
+
+        // Reset size
         size = 0;
     }
 
@@ -506,6 +504,8 @@ public class HashMap<K, V> implements Iterable<K> {
      * @return an iterator over the keys in the map
      */
     public Iterator<K> iterator() {
+
+        // Return custom iterator
         return new HashMapIterator();
     }
 
@@ -527,8 +527,8 @@ public class HashMap<K, V> implements Iterable<K> {
          */
         @Override
         public boolean hasNext() {
-            // If we have returned fewer than size active elements,
-            // then more exist
+
+            // If we haven't returned size active elements yet
             return seen < size;
         }
 
@@ -539,31 +539,30 @@ public class HashMap<K, V> implements Iterable<K> {
          */
         @Override
         public K next() {
-            // If there are no more elements, throw exception
+
+            // If iterator exhausted
             if (!hasNext()) {
                 throw new NoSuchElementException("No more elements");
             }
 
-            // Advance index until we hit active entry
-            // This skips over nulls and tombstones or del markers
+            // Skip null entries and tombstones
             while (index < table.length
                     && (table[index] == null || table[index].isRemoved())) {
                 index++;
             }
 
-            // FIX: defensive guard against out-of-bounds
+            // Defensive bounds check
             if (index >= table.length) {
                 throw new NoSuchElementException("No more elements");
             }
 
-            // Extract key at current index
+            // Retrieve key at current index
             K key = table[index].getKey();
 
-            // Move forward for next call
+            // Advance iterator state
             index++;
             seen++;
 
-            // Return the found key
             return key;
         }
     }
