@@ -19,6 +19,20 @@ import java.util.Set;
  * @version 1.0
  * @userid khenry61
  * @GTID 904065531
+ * <br>
+ * <p>
+ * Collaborators: NONE
+ * <p>
+ * Resources: NONE
+ * <p>
+ * <br>
+ * By typing 'I agree' below, you are agreeing that this is your
+ * own work and that you are responsible for the contents of all
+ * submitted files. If this is left blank, this project will lose
+ * points.
+ *<p>
+ *<br>
+ * Agree Here: I agree
  *
  * @param <K> the type of key; must be {@link Comparable}
  * @param <V> the type of value
