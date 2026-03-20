@@ -40,7 +40,13 @@ import java.util.Set;
 @SuppressWarnings("DuplicatedCode")
 public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMap<K, V> {
 
+    // Root node of the AVL tree.
+    // Keeping a direct root reference allows all top-level operations
+    // like put, get, and remove to begin in O(1) time.
     private TreeMapNode<K, V> root;
+
+    // Number of key-value pairs currently stored in the tree.
+    // This is tracked explicitly so size() can run in O(1) time.
     private int size;
 
     /**
@@ -53,11 +59,22 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @throws IllegalArgumentException if key or value is null
      */
     public V put(K key, V value) {
+        // Null keys or values are rejected immediately so the tree never stores
+        // invalid entries and comparison logic never has to deal with null keys.
         if (key == null || value == null) {
             throw new IllegalArgumentException("key and value must be non-null.");
         }
+
+        // This small box is used so the recursive helper can communicate back
+        // the old value if an existing key gets replaced.
         ValueBox<V> old = new ValueBox<>();
+
+        // Reassign root because AVL insertions may rotate the subtree,
+        // which can change the root of the entire tree.
         root = putH(root, key, value, old);
+
+        // If the key already existed, old.value holds the replaced value.
+        // Otherwise it remains null, which matches the required return behavior.
         return old.value;
     }
 
@@ -72,23 +89,39 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @return the updated subtree root after insertion and balancing
      */
     private TreeMapNode<K, V> putH(TreeMapNode<K, V> curr, K key, V value, ValueBox<V> old) {
+        // Base case: once we reach a null spot, this is where the new key belongs.
+        // Insertion into an AVL tree still starts as ordinary BST insertion.
         if (curr == null) {
             size++;
             return new TreeMapNode<>(key, value);
         }
 
+        // Compare the incoming key to the current node's key to decide which direction
+        // to continue searching. This is the core BST ordering rule.
         int comp = key.compareTo(curr.getKey());
         if (comp < 0) {
+            // Smaller keys go into the left subtree.
             curr.setLeft(putH(curr.getLeft(), key, value, old));
         } else if (comp > 0) {
+            // Larger keys go into the right subtree.
             curr.setRight(putH(curr.getRight(), key, value, old));
         } else {
+            // Matching key means this is an update, not a structural insertion.
+            // Save the old value so the public put() can return it.
             old.value = curr.getValue();
+
+            // Replace only the value, because the key is already in the correct location.
             curr.setValue(value);
+
+            // No structure changed, so no further balancing is needed here.
             return curr;
         }
 
+        // After inserting into a subtree, this node's cached height and balance factor
+        // may have changed, so update them before checking balance.
         update(curr);
+
+        // AVL trees rebalance on the way back up recursion so height stays O(log n).
         return balance(curr);
     }
 
@@ -101,21 +134,28 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @throws NoSuchElementException if key is not in the map
      */
     public V get(K key) {
+        // Null keys are invalid because comparison-based search cannot operate on them.
         if (key == null) {
             throw new IllegalArgumentException("key must be non-null.");
         }
 
+        // Start at the root and walk downward like a standard BST search.
         TreeMapNode<K, V> curr = root;
         while (curr != null) {
             int comp = key.compareTo(curr.getKey());
             if (comp < 0) {
+                // If the target key is smaller, it can only be in the left subtree.
                 curr = curr.getLeft();
             } else if (comp > 0) {
+                // If the target key is larger, it can only be in the right subtree.
                 curr = curr.getRight();
             } else {
+                // Found exact key match, so return the associated value.
                 return curr.getValue();
             }
         }
+
+        // Reaching null means the key is not in the tree.
         throw new NoSuchElementException("key not found.");
     }
 
@@ -127,10 +167,13 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @throws IllegalArgumentException if key is null
      */
     public boolean containsKey(K key) {
+        // Same validation reasoning as get(): a null key is not searchable.
         if (key == null) {
             throw new IllegalArgumentException("key must be non-null.");
         }
 
+        // This uses the exact same BST walk pattern as get(),
+        // but only answers presence/absence instead of returning a value.
         TreeMapNode<K, V> curr = root;
         while (curr != null) {
             int comp = key.compareTo(curr.getKey());
@@ -142,6 +185,8 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
                 return true;
             }
         }
+
+        // If the search falls off the tree, the key is not present.
         return false;
     }
 
@@ -154,12 +199,20 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @throws NoSuchElementException if key not present
      */
     public V remove(K key) {
+        // Null keys are invalid for the same reasons as other lookup operations.
         if (key == null) {
             throw new IllegalArgumentException("key must be non-null.");
         }
 
+        // This box lets the recursive helper communicate the removed value back
+        // through the recursive calls.
         ValueBox<V> removed = new ValueBox<>();
+
+        // Reassign root because deletion can rebalance the tree and change
+        // the subtree root, including the overall root.
         root = removeH(root, key, removed);
+
+        // Return the value that belonged to the deleted key.
         return removed.value;
     }
 
@@ -172,32 +225,55 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @return the updated subtree root after removal and balancing
      */
     private TreeMapNode<K, V> removeH(TreeMapNode<K, V> curr, K key, ValueBox<V> removed) {
+        // Falling off the tree means the key was never found.
         if (curr == null) {
             throw new NoSuchElementException("key not found.");
         }
 
+        // Use BST ordering to locate the node to delete.
         int comp = key.compareTo(curr.getKey());
         if (comp < 0) {
+            // Target key is smaller, so deletion must occur in the left subtree.
             curr.setLeft(removeH(curr.getLeft(), key, removed));
         } else if (comp > 0) {
+            // Target key is larger, so deletion must occur in the right subtree.
             curr.setRight(removeH(curr.getRight(), key, removed));
         } else {
+            // We found the node to delete, so record its value for the public return.
             removed.value = curr.getValue();
             size--;
 
+            // Case 1: no left child.
+            // The right child can simply move up and replace this node.
             if (curr.getLeft() == null) {
                 return curr.getRight();
+
+            // Case 2: no right child.
+            // The left child can simply move up and replace this node.
             } else if (curr.getRight() == null) {
                 return curr.getLeft();
+
             } else {
+                // Case 3: two children.
+                // This implementation uses the predecessor, meaning the maximum node
+                // in the left subtree, to preserve BST ordering after deletion.
                 NodeBox<K, V> pred = new NodeBox<>();
+
+                // Remove the predecessor node from the left subtree and capture its data.
                 curr.setLeft(removePredecessor(curr.getLeft(), pred));
+
+                // Copy the predecessor's key and value into the current node.
+                // This avoids deleting the current node object itself and only changes its contents.
                 curr.setKey(pred.key);
                 curr.setValue(pred.value);
             }
         }
 
+        // After a successful deletion in a subtree, this node's height and balance factor
+        // may have changed, so they must be recomputed.
         update(curr);
+
+        // Restore AVL balance before returning the subtree upward.
         return balance(curr);
     }
 
@@ -210,14 +286,25 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @return the updated subtree root after predecessor removal
      */
     private TreeMapNode<K, V> removePredecessor(TreeMapNode<K, V> curr, NodeBox<K, V> pred) {
+        // The predecessor is the rightmost node in a subtree.
+        // So once there is no more right child, this node is the predecessor.
         if (curr.getRight() == null) {
+            // Save the predecessor's data so the caller can copy it upward.
             pred.key = curr.getKey();
             pred.value = curr.getValue();
+
+            // Remove this predecessor node by returning its left subtree,
+            // which is the only subtree it can possibly have.
             return curr.getLeft();
         }
 
+        // Keep moving right until the predecessor is found.
         curr.setRight(removePredecessor(curr.getRight(), pred));
+
+        // After removal from the right subtree, update this node's metadata.
         update(curr);
+
+        // Rebalance because predecessor removal may have changed subtree heights.
         return balance(curr);
     }
 
@@ -232,15 +319,22 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @throws IllegalArgumentException if lower or upper is null
      */
     public List<V> getRange(K lower, K upper) {
+        // Bounds must exist because range comparisons depend on valid comparable values.
         if (lower == null || upper == null) {
             throw new IllegalArgumentException("bounds must be non-null.");
         }
 
+        // This list collects results in sorted order as the traversal progresses.
         List<V> out = new ArrayList<>();
+
+        // Fast-return cases:
+        // 1) empty tree means no results
+        // 2) invalid range lower > upper can never match anything
         if (root == null || lower.compareTo(upper) > 0) {
             return out;
         }
 
+        // Delegate to the bounded traversal helper.
         getRangeH(root, lower, upper, out);
         return out;
     }
@@ -255,26 +349,32 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @param out the list collecting qualifying values
      */
     private void getRangeH(TreeMapNode<K, V> curr, K lower, K upper, List<V> out) {
+        // Standard recursive base case for tree traversal.
         if (curr == null) {
             return;
         }
 
+        // Compare current key to the range bounds once and reuse the results.
+        // This avoids repeating compareTo calls unnecessarily.
         int cmpLower = curr.getKey().compareTo(lower);
         int cmpUpper = curr.getKey().compareTo(upper);
 
-        // Only go left if current key is greater than lower bound —
-        // there may be qualifying keys in the left subtree
+        // Only go left if current key is greater than lower bound.
+        // If current key is already <= lower, then everything in the left subtree
+        // is even smaller and cannot qualify, so pruning that side preserves the
+        // desired O(log n + k) behavior.
         if (cmpLower > 0) {
             getRangeH(curr.getLeft(), lower, upper, out);
         }
 
-        // Visit current node if key is within [lower, upper]
+        // Visit the current node only if its key lies inside the inclusive range.
         if (cmpLower >= 0 && cmpUpper <= 0) {
             out.add(curr.getValue());
         }
 
-        // Only go right if current key is less than upper bound —
-        // there may be qualifying keys in the right subtree
+        // Only go right if current key is less than upper bound.
+        // If current key is already >= upper, then everything in the right subtree
+        // is even larger and cannot qualify.
         if (cmpUpper < 0) {
             getRangeH(curr.getRight(), lower, upper, out);
         }
@@ -286,7 +386,10 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @return a set of keys in sorted order
      */
     public Set<K> keySet() {
+        // Allocate a collection to gather every key in the tree.
         Set<K> keys = new HashSet<>();
+
+        // Traverse the whole tree and collect the keys.
         keySetH(root, keys);
         return keys;
     }
@@ -299,9 +402,13 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @param keys the set collecting keys
      */
     private void keySetH(TreeMapNode<K, V> curr, Set<K> keys) {
+        // Base case: nothing to add from an empty subtree.
         if (curr == null) {
             return;
         }
+
+        // In-order traversal visits left subtree, current node, then right subtree.
+        // That is the natural way to process BST keys in ascending order.
         keySetH(curr.getLeft(), keys);
         keys.add(curr.getKey());
         keySetH(curr.getRight(), keys);
@@ -313,7 +420,10 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @return a list of values in key-sorted order
      */
     public List<V> values() {
+        // This list collects values in the same order as their sorted keys.
         List<V> vals = new ArrayList<>();
+
+        // In-order traversal of a BST naturally yields values in ascending key order.
         valuesH(root, vals);
         return vals;
     }
@@ -326,9 +436,13 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @param vals the list collecting values
      */
     private void valuesH(TreeMapNode<K, V> curr, List<V> vals) {
+        // Standard recursive base case.
         if (curr == null) {
             return;
         }
+
+        // In-order traversal preserves ascending key order,
+        // which is why TreeMap values come out sorted by key.
         valuesH(curr.getLeft(), vals);
         vals.add(curr.getValue());
         valuesH(curr.getRight(), vals);
@@ -338,7 +452,11 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * Clears the map.
      */
     public void clear() {
+        // Dropping the root reference makes the entire tree unreachable,
+        // which effectively clears all contents at once.
         root = null;
+
+        // Reset the cached size so the map reports empty immediately in O(1).
         size = 0;
     }
 
@@ -348,6 +466,8 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @return -1 if empty; otherwise root height
      */
     public int height() {
+        // By convention, an empty tree has height -1.
+        // Otherwise the tree height is exactly the root's cached height.
         return (root == null) ? -1 : root.getHeight();
     }
 
@@ -357,6 +477,7 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @return the size
      */
     public int size() {
+        // Return the cached size in O(1) time.
         return size;
     }
 
@@ -366,6 +487,7 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @return root node of the AVL tree
      */
     public TreeMapNode<K, V> getRoot() {
+        // Exposes the root reference for debugging, testing, or visualization.
         return root;
     }
 
@@ -376,6 +498,9 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      */
     @Override
     public Iterator<V> iterator() {
+        // Return a dedicated iterator object that performs lazy in-order traversal.
+        // This is more efficient than building a full values list first if the caller
+        // only consumes part of the iteration.
         return new TreeMapIterator();
     }
 
@@ -385,9 +510,15 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @param node the node to update
      */
     private void update(TreeMapNode<K, V> node) {
+        // Missing children are treated as height -1 so leaf nodes end up with height 0.
         int lh = (node.getLeft() == null) ? -1 : node.getLeft().getHeight();
         int rh = (node.getRight() == null) ? -1 : node.getRight().getHeight();
+
+        // Height is one plus the height of the taller child.
         node.setHeight(1 + Math.max(lh, rh));
+
+        // AVL balance factor is left height minus right height.
+        // Positive means left-heavy, negative means right-heavy.
         node.setBalanceFactor(lh - rh);
     }
 
@@ -398,14 +529,23 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @return the new subtree root after rotation
      */
     private TreeMapNode<K, V> leftRotate(TreeMapNode<K, V> node) {
+        // In a left rotation, the node's right child becomes the new root of this subtree.
         TreeMapNode<K, V> newRoot = node.getRight();
+
+        // The new root's left subtree gets transferred to become the old node's right subtree.
+        // This preserves BST ordering during the rotation.
         TreeMapNode<K, V> transfer = newRoot.getLeft();
 
+        // Perform the structural pointer changes for the rotation.
         newRoot.setLeft(node);
         node.setRight(transfer);
 
+        // Update bottom-up: first the old root, then the new root.
+        // This order matters because newRoot's metadata depends on node already being correct.
         update(node);
         update(newRoot);
+
+        // Return the new subtree root so the caller can reconnect it upward.
         return newRoot;
     }
 
@@ -416,14 +556,22 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @return the new subtree root after rotation
      */
     private TreeMapNode<K, V> rightRotate(TreeMapNode<K, V> node) {
+        // In a right rotation, the node's left child becomes the new root of this subtree.
         TreeMapNode<K, V> newRoot = node.getLeft();
+
+        // The new root's right subtree gets transferred to become the old node's left subtree.
+        // This is the mirror image of left rotation.
         TreeMapNode<K, V> transfer = newRoot.getRight();
 
+        // Perform the structural pointer updates for the rotation.
         newRoot.setRight(node);
         node.setLeft(transfer);
 
+        // Recompute cached metadata after the structure changes.
         update(node);
         update(newRoot);
+
+        // Return the new root of the rotated subtree.
         return newRoot;
     }
 
@@ -435,20 +583,33 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @return the new subtree root after balancing
      */
     private TreeMapNode<K, V> balance(TreeMapNode<K, V> node) {
+        // Read the balance factor once since it determines which case applies.
         int bf = node.getBalanceFactor();
 
+        // Left-heavy subtree.
         if (bf > 1) {
+            // If the left child is right-heavy, this is a left-right case.
+            // First rotate the child left to convert it into a simple left-left case.
             if (node.getLeft() != null && node.getLeft().getBalanceFactor() < 0) {
                 node.setLeft(leftRotate(node.getLeft()));
             }
+
+            // Then rotate the current node right to restore AVL balance.
             return rightRotate(node);
+
+        // Right-heavy subtree.
         } else if (bf < -1) {
+            // If the right child is left-heavy, this is a right-left case.
+            // First rotate the child right to convert it into a simple right-right case.
             if (node.getRight() != null && node.getRight().getBalanceFactor() > 0) {
                 node.setRight(rightRotate(node.getRight()));
             }
+
+            // Then rotate the current node left to restore AVL balance.
             return leftRotate(node);
         }
 
+        // If balance factor is between -1 and 1, this node is already AVL-valid.
         return node;
     }
 
@@ -459,6 +620,9 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @param <T> the boxed value type
      */
     private static class ValueBox<T> {
+        // Java passes object references by value, so recursion cannot directly "return"
+        // an extra piece of data alongside the subtree root.
+        // This wrapper provides a mutable container for that purpose.
         private T value;
     }
 
@@ -470,7 +634,10 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      * @param <V> value type
      */
     private static class NodeBox<K, V> {
+        // Stores the predecessor's key during two-child deletion.
         private K key;
+
+        // Stores the predecessor's value during two-child deletion.
         private V value;
     }
 
@@ -480,6 +647,8 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
      */
     private class TreeMapIterator implements Iterator<V> {
 
+        // This stack simulates the recursion of an in-order traversal.
+        // Using an explicit stack avoids having to precompute all values in a list.
         private final Deque<TreeMapNode<K, V>> stack = new ArrayDeque<>();
 
         /**
@@ -487,6 +656,8 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
          * with the leftmost path of the tree.
          */
         private TreeMapIterator() {
+            // Start by pushing the root-to-leftmost path.
+            // That ensures the smallest key is on top first, which matches in-order traversal.
             pushLeft(root);
         }
 
@@ -497,6 +668,9 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
          */
         private void pushLeft(TreeMapNode<K, V> node) {
             TreeMapNode<K, V> curr = node;
+
+            // Walk left as far as possible, pushing each node.
+            // This makes the stack's top always hold the next in-order node to visit.
             while (curr != null) {
                 stack.push(curr);
                 curr = curr.getLeft();
@@ -510,6 +684,7 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
          */
         @Override
         public boolean hasNext() {
+            // If the stack still has nodes, there is still an in-order value remaining.
             return !stack.isEmpty();
         }
 
@@ -521,14 +696,21 @@ public class TreeMap<K extends Comparable<? super K>, V> implements StaticTreeMa
          */
         @Override
         public V next() {
+            // Standard iterator contract: calling next() with no remaining elements is an error.
             if (!hasNext()) {
                 throw new NoSuchElementException();
             }
 
+            // Pop the next in-order node from the stack.
             TreeMapNode<K, V> node = stack.pop();
+
+            // After visiting a node, the next in-order values come from its right subtree.
+            // Specifically, the leftmost path of that right subtree must be pushed.
             if (node.getRight() != null) {
                 pushLeft(node.getRight());
             }
+
+            // Return the value associated with the visited node.
             return node.getValue();
         }
     }
