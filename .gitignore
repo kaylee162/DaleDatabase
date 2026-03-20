@@ -1,0 +1,34 @@
+# ===== Assignment / submission files =====
+PR2.pdf
+submit-unix.sh
+submit-windows.bat
+
+# ===== IDE files =====
+.idea/
+.vscode/
+*.iml
+
+# ===== Java compiled output =====
+*.class
+out/
+bin/
+build/
+target/
+
+# ===== Logs =====
+*.log
+
+# ===== OS files =====
+.DS_Store
+Thumbs.db
+
+# ===== Archives =====
+*.zip
+*.tar
+*.gz
+*.rar
+
+# ===== Temporary files =====
+*.tmp
+*.swp
+*~
