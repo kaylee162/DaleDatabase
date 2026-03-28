@@ -433,7 +433,7 @@ public class DaleDB implements StaticDaleDB {
      * This method should examine {@link DaleRecord.BoundaryEvent}
      * records over time, taking into account who is visiting the
      * pond the most times
-     *
+     * 
      * @param pond the pond key
      * @return the name of the most frequent visitor; {@code null} otherwise
      * @throws IllegalArgumentException if {@code pond} is {@code null}
@@ -501,7 +501,7 @@ public class DaleDB implements StaticDaleDB {
      * another in ascending order of timestamp. The result maps each latest
      * timestamp to the list of pruned timestamps for that sensor, also
      * sorted in ascending order.
-     *
+     * 
      * @param pond the pond key
      * @return a map where each key is the latest timestamp and each value
      *         is the list of timestamps that were merged into it, in
